@@ -48,16 +48,9 @@ git clone https://github.com/Jamova01/wallet-api.git
 cd wallet-api
 ```
 
-### 2. Install uv (if not already installed)
+### 2. Install uv (recommended)
 ```bash
-# Use curl to download the script and execute it with sh:
 curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# If your system doesn't have curl, you can use wget:
-wget -qO- https://astral.sh/uv/install.sh | sh
-
-# Request a specific version by including it in the URL:
-curl -LsSf https://astral.sh/uv/0.9.13/install.sh | sh
 ```
 ### 3. Install dependencies
 ```bash
@@ -65,12 +58,13 @@ curl -LsSf https://astral.sh/uv/0.9.13/install.sh | sh
 uv sync
 ```
 
-### 4. Activate the virtual environment (optional)
+### 4. Run the API
+You can run the app without activating the environment:
 ```bash
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+fastapi dev app/main.py
 ```
-
-> **💡 Tip:** With uv, you can run commands directly without activating the environment:
-> ```bash
-> uv run uvicorn app.main:app --reload
-> ```
+Or manually activate:
+```bash
+source .venv/bin/activate
+fastapi dev app/main.py
+```

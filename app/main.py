@@ -1,20 +1,19 @@
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
-from app.core.database import create_db_and_tables
 from app.api.main import api_router
+from app.core.config import settings
+from app.core.database import create_db_and_tables
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # --- STARTUP ---
-    # Create database tables if they do not exist yet
     create_db_and_tables()
-
     yield
-
     # --- SHUTDOWN ---
-    # Here you can add any shutdown logic if needed
+    # (optional cleanup)
     pass
 
 
@@ -30,4 +29,5 @@ async def root():
     return {"message": "Hello World"}
 
 
-app.include_router(api_router, prefix="/api/v1")
+# Register routers
+app.include_router(api_router, prefix=settings.API_V1_STR)

@@ -1,7 +1,9 @@
 from typing import List
 from uuid import UUID
-from sqlmodel import Session, select
+
 from fastapi import HTTPException, status
+from sqlmodel import Session, select
+
 from app.core.security import get_password_hash
 from app.models.user import User
 from app.schemas.user import UserCreate, UserRead, UserUpdate
@@ -19,6 +21,11 @@ def get_by_id(session: Session, user_id: UUID) -> UserRead:
             detail=f"User with id {user_id} not found",
         )
     return user
+
+
+def get_user_by_email(session: Session, email: str) -> User | None:
+    statement = select(User).where(User.email == email)
+    return session.exec(statement).first()
 
 
 def create(session: Session, user: UserCreate) -> UserRead:
@@ -44,7 +51,6 @@ def create(session: Session, user: UserCreate) -> UserRead:
 
 def update(session: Session, user_id: UUID, user: UserUpdate) -> UserRead:
     db_user = get_by_id(session, user_id)
-
     update_data = user.model_dump(exclude_unset=True)
 
     if "password" in update_data:

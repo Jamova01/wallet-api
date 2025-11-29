@@ -5,10 +5,10 @@ from sqlmodel import SQLModel, Field
 
 
 class UserBase(SQLModel):
-    email: str
-    full_name: str
-    is_active: bool
-    is_superuser: bool
+    email: EmailStr = Field(unique=True, index=True, max_length=255)
+    full_name: str | None = Field(default=None, max_length=255)
+    is_active: bool = Field(default=True)
+    is_superuser: bool = Field(default=False)
 
 
 class UserCreate(UserBase):
@@ -20,14 +20,17 @@ class UserRead(UserBase):
     created_at: datetime
     updated_at: datetime
 
-class UserUpdate(SQLModel):
+
+class UserUpdate(UserBase):
     email: EmailStr | None = Field(default=None, max_length=255)
-    full_name: str | None = None
     password: str | None = Field(default=None, min_length=8)
-    is_active: bool | None = None
 
 
 class UserUpdateMe(SQLModel):
+    full_name: str | None = Field(default=None, max_length=255)
     email: EmailStr | None = Field(default=None, max_length=255)
-    full_name: str | None = None
-    password: str | None = Field(default=None, min_length=8)
+
+
+class UpdatePassword(SQLModel):
+    current_password: str = Field(min_length=8, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)

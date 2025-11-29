@@ -1,23 +1,75 @@
 from typing import List
 from uuid import UUID
-from fastapi import APIRouter, status, Response
-from app.api.dependencies import SessionDep
-from app.schemas.user import UserCreate, UserRead, UserUpdate
+from fastapi import APIRouter, Depends, status
+from app.api.dependencies import CurrentUser, SessionDep, get_current_active_superuser
+from app.schemas.common import Message
+from app.schemas.user import (
+    UpdatePassword,
+    UserCreate,
+    UserRead,
+    UserUpdate,
+    UserUpdateMe,
+)
 from app.services import user_service
 
-router = APIRouter(
-    prefix="/users",
-    tags=["users"],
+router = APIRouter(prefix="/users", tags=["users"])
+
+
+@router.get(
+    "/me",
+    summary="Get current user",
+    response_model=UserRead,
 )
+async def read_user_me(current_user: CurrentUser) -> UserRead:
+    """Retrieve the currently authenticated user's profile."""
+    return current_user
+
+
+@router.patch(
+    "/me",
+    summary="Update own user",
+    response_model=UserRead,
+)
+async def update_user_me(
+    session: SessionDep,
+    user: UserUpdateMe,
+    current_user: CurrentUser,
+) -> UserRead:
+    """Update the currently authenticated user's profile."""
+    return user_service.update_me(
+        session=session,
+        current_user=current_user,
+        user=user,
+    )
+
+
+@router.patch(
+    "/me/password",
+    summary="Update own password",
+    response_model=Message,
+)
+async def update_password_me(
+    session: SessionDep,
+    body: UpdatePassword,
+    current_user: CurrentUser,
+) -> Message:
+    """Update the currently authenticated user's password."""
+    return user_service.update_password(
+        session=session,
+        body=body,
+        current_user=current_user,
+    )
 
 
 @router.get(
     "",
     summary="Get all users",
     status_code=status.HTTP_200_OK,
+    dependencies=[Depends(get_current_active_superuser)],
     response_model=List[UserRead],
 )
 async def read_users(session: SessionDep) -> List[UserRead]:
+    """Retrieve all users (superuser only)."""
     return user_service.get_all(session)
 
 
@@ -25,9 +77,14 @@ async def read_users(session: SessionDep) -> List[UserRead]:
     "",
     summary="Create a new user",
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(get_current_active_superuser)],
     response_model=UserRead,
 )
-async def create_user(user: UserCreate, session: SessionDep):
+async def create_user(
+    session: SessionDep,
+    user: UserCreate,
+) -> UserRead:
+    """Create a new user (superuser only)."""
     return user_service.create(session, user)
 
 
@@ -35,27 +92,39 @@ async def create_user(user: UserCreate, session: SessionDep):
     "/{user_id}",
     summary="Get user by ID",
     status_code=status.HTTP_200_OK,
+    dependencies=[Depends(get_current_active_superuser)],
     response_model=UserRead,
 )
 async def read_user(user_id: UUID, session: SessionDep) -> UserRead:
-    return user_service.get_by_id(session, user_id)
+    """Retrieve a user by ID (superuser only)."""
+    return user_service.get_by_id(session=session, user_id=user_id)
 
 
-@router.put(
+@router.patch(
     "/{user_id}",
-    summary="Update user completely",
+    summary="Update user",
     status_code=status.HTTP_200_OK,
+    dependencies=[Depends(get_current_active_superuser)],
     response_model=UserRead,
 )
-async def update_user(user_id: UUID, user: UserUpdate, session: SessionDep) -> UserRead:
-    return user_service.update(session, user_id, user)
+async def update_user(
+    session: SessionDep,
+    user_id: UUID,
+    user: UserUpdate,
+) -> UserRead:
+    """Update a user by ID (superuser only)."""
+    return user_service.update(session=session, user_id=user_id, user=user)
 
 
 @router.delete(
     "/{user_id}",
     summary="Delete user",
     status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(get_current_active_superuser)],
 )
-async def delete_user(user_id: UUID, session: SessionDep) -> None:
-    user_service.delete(session, user_id)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    session: SessionDep,
+    user_id: UUID,
+) -> None:
+    """Delete a user by ID (superuser only)."""
+    user_service.delete(session=session, user_id=user_id)

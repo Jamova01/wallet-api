@@ -59,11 +59,11 @@ source .venv/bin/activate
 ### 5. Install main dependencies
 
 ```bash
-# Install FastAPI with standard dependencies (includes uvicorn, pydantic, etc.)
 uv add "fastapi[standard]"
-
-# Install SQLModel (ORM that combines SQLAlchemy + Pydantic)
 uv add sqlmodel
+uv add pwdlib[argon2]
+uv add pydantic-settings
+uv add pyjwt
 ```
 
 ### 6. Create project folder structure
@@ -85,7 +85,7 @@ touch app/__init__.py \
 touch app/main.py
 
 # Create documentation
-touch README.md docs/setup.md
+touch README.md docs/environment.md
 ```
 
 ### 7. Configure .gitignore file
@@ -129,6 +129,22 @@ Thumbs.db
 EOF
 ```
 
+## Environment Variables
+
+Create a `.env` file with the following content:
+```bash
+SECRET_KEY=your_secret_key
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+API_V1_STR=/api/v1
+
+# First superuser
+FIRST_SUPERUSER=admin@example.com
+FIRST_SUPERUSER_PASSWORD=supersecurepassword
+```
+> These variables are loaded in `app/core/config.py` using Pydantic `BaseSettings`.
+
+
 ## Project Structure
 
 The project follows the **layered architecture** pattern, where each folder has a specific responsibility:
@@ -136,44 +152,29 @@ The project follows the **layered architecture** pattern, where each folder has 
 ```
 wallet-api/
 ├── app/
-│   ├── __init__.py
-│   ├── main.py                 # Application entry point
-│   │
-│   ├── api/                    # 🔗 Endpoints and routers layer
-│   │   ├── __init__.py
-│   │   ├── routes/             # Routers organized by domain
-│   │   └── dependencies.py     # Shared FastAPI dependencies
-│   │
-│   ├── core/                   # ⚙️ Core configuration
-│   │   ├── __init__.py
-│   │   ├── config.py           # Settings and environment variables
-│   │   ├── database.py         # Database connection
-│   │   └── security.py         # Authentication and authorization
-│   │
-│   ├── models/                 # 💾 Database models (SQLModel)
-│   │   ├── __init__.py
-│   │   └── user.py             # Example: user model
-│   │
-│   ├── schemas/                # 📋 Pydantic schemas (request/response)
-│   │   ├── __init__.py
-│   │   └── user.py             # Example: user schemas
-│   │
-│   └── services/               # 💼 Business logic
-│       ├── __init__.py
-│       └── user_service.py     # Example: user service
-│
-├── tests/                      # 🧪 Unit and integration tests
-│   ├── __init__.py
-│   └── test_api/
-│
-├── docs/                       # 📚 Project documentation
-│   └── setup.md
-│
-├── .venv/                      # Virtual environment (do not version)
-├── .gitignore                  # Files ignored by Git
-├── pyproject.toml              # Configuration and dependencies
-├── uv.lock                     # Dependencies lock file
-└── README.md                   # Main documentation
+│   ├── main.py                 # App entry point
+│   ├── api/                    # Endpoints and routers
+│   │   ├── dependencies.py     # Shared dependencies (JWT, DB session)
+│   │   └── routes/             # Routers by domain
+│   ├── core/                   # Configuration, DB, security
+│   │   ├── config.py           # Environment variables
+│   │   ├── database.py         # DB connection & session
+│   │   ├── security.py         # JWT and password utilities
+│   │   └── superuser.py        # Create first superuser
+│   ├── models/                 # SQLModel models
+│   │   └── user.py
+│   ├── schemas/                # Pydantic/SQLModel schemas
+│   │   ├── common.py           # Generic schemas (Message)
+│   │   └── user.py             # User-related schemas
+│   └── services/               # Business logic
+│       └── user_service.py
+├── tests/                      # Unit/integration tests
+├── docs/                       # Documentation
+├── .venv/                      # Virtual environment
+├── .gitignore
+├── pyproject.toml
+├── uv.lock
+└── README.md
 ```
 
 ## Layer Responsibilities
@@ -186,17 +187,19 @@ wallet-api/
 | **schemas/** | Defines data structures for API | Request/response bodies, validations |
 | **services/** | Contains business logic | CRUD operations, calculations, business rules |
 
-## Next Steps
+## Superuser Initialization
+On first application startup, the superuser defined in `.env` will be created automatically using `create_first_superuser()` from `app/core/superuser.py`.
 
-1. **Configure the database** in `app/core/database.py`
-2. **Create your first model** in `app/models/`
-3. **Define schemas** in `app/schemas/`
-4. **Implement services** in `app/services/`
-5. **Create endpoints** in `app/api/`
-6. **Run the application**:
-   ```bash
-   fastapi dev app/main.py
-   ```
+* This ensures `/users/me` routes and admin operations are immediately accessible.
+
+## Run the application
+```bash
+# Development server
+fastapi dev app/main.py
+
+# Production server
+fastapi run app/main.py
+```
 
 ## Useful Commands
 
@@ -220,6 +223,16 @@ fastapi run app/main.py
 # http://127.0.0.1:8000/docs (Swagger UI)
 # http://127.0.0.1:8000/redoc (ReDoc)
 ```
+
+
+## Next Steps
+
+1. **Configure the database** in `app/core/database.py`
+2. **Create models** in `app/models/`
+3. **Define schemas** in `app/schemas/`
+4. **Implement services** in `app/services/`
+5. **Create endpoints** in `app/api/`
+6. Test JWT authentication and /me endpoints
 
 ## Additional Resources
 

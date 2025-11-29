@@ -132,7 +132,7 @@ EOF
 ## Environment Variables
 
 Create a `.env` file with the following content:
-```bash
+```env
 SECRET_KEY=your_secret_key
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30

@@ -4,16 +4,20 @@ from fastapi import FastAPI
 
 from app.api.main import api_router
 from app.core.config import settings
-from app.core.database import create_db_and_tables
+from app.core.database import create_db_and_tables, get_sync_session
+from app.core.superuser import create_first_superuser
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # --- STARTUP ---
     create_db_and_tables()
+
+    session = get_sync_session()
+    create_first_superuser(session)
+    session.close()
+
     yield
-    # --- SHUTDOWN ---
-    # (optional cleanup)
+
     pass
 
 
@@ -29,5 +33,4 @@ async def root():
     return {"message": "Hello World"}
 
 
-# Register routers
 app.include_router(api_router, prefix=settings.API_V1_STR)

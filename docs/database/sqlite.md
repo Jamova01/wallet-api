@@ -10,8 +10,9 @@ This document explains how the database of the **Wallet API project** is configu
 - **SQLite** (lightweight database for local development)
 - **FastAPI**
 - **SQLAlchemy engine**
+- **Pydantic Settings** (environment variables)
 
-> **Note:** This setup is ideal for development. You can later switch to PostgreSQL with minimal changes.
+> **Note:** Ideal setup for local development. Switching to PostgreSQL later requires minimal changes.
 
 ---
 
@@ -19,9 +20,12 @@ This document explains how the database of the **Wallet API project** is configu
 ```
 app/
 ├── core/
-│   └── database.py     ← DB engine + session + table creation
-├── main.py             ← FastAPI instance with lifespan hook
-└── models/             ← SQLModel models
+│   ├── config.py         ← Environment variables (incl. superuser)
+│   ├── database.py       ← DB engine + session + table creation
+│   └── superuser.py      ← Logic to create first superuser
+├── main.py               ← FastAPI instance + lifespan startup process
+└── models/               ← SQLModel models
+
 ```
 
 ---
@@ -43,79 +47,120 @@ def create_db_and_tables():
 def get_session():
     with Session(engine) as session:
         yield session
+
+def get_sync_session() -> Session:
+    return Session(engine)
 ```
 
 ### 3.1 Engine Configuration
+
 ```python
 engine = create_engine(sqlite_url, connect_args={"check_same_thread": False})
 ```
 
 - Uses a local SQLite file
-- `check_same_thread=False` allows the database to be accessed across threads (needed for FastAPI)
-- No external DB server is required
+- Allows multithread access (`check_same_thread=False`)
+- Zero external dependencies
 
 ### 3.2 Automatic Table Creation
+
 ```python
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
 ```
-
-- This creates all SQLModel-defined tables if they do not already exist
-- This function is executed automatically on application startup (see lifespan section)
+- Executed on startup to ensure all SQLModel tables exist.
 
 ### 3.3 Session Handling
-```python
-def get_session():
-    with Session(engine) as session:
-        yield session
-```
 
-- Uses a generator with `yield`, enabling FastAPI to manage the session lifecycle
-- It is injected into endpoints using FastAPI dependencies:
-```python
-def read_users(session: SessionDep):
-    session.exec(...)
-```
+Two session providers exist:
+
+| Function | Usage |
+|----------|-------|
+| `get_session()` | Async dependencies inside routes |
+| `get_sync_session()` | Synchronous logic executed at startup, e.g., superuser creation |
 
 ---
 
-## 4. 🚀 Integration with FastAPI (`main.py`)
+## 4. 🔐 Superuser Auto-Creation
+
+A key part of the system initialization is the automatic creation of the first superuser, defined via environment variables.
+
+### 4.1 Settings Configuration (`config.py`)
+
+```python
+FIRST_SUPERUSER: EmailStr
+FIRST_SUPERUSER_PASSWORD: str
+```
+
+These values are read from `.env`.
+
+### 4.2 Superuser Logic (`superuser.py`)
+
+```python
+def create_first_superuser(session: Session):
+    # Checks if a superuser exists; if not, creates one
+```
+
+### 4.3 When is the Superuser Created?
+
+Inside `main.py`, during the lifespan startup event:
+
+```python
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_db_and_tables()
+
+    session = get_sync_session()
+    create_first_superuser(session)
+    session.close()
+
+    yield
+```
+
+This ensures:
+- Tables exist
+- Superuser is created only once
+- Works synchronously before the app starts serving requests
+
+## 5. 🚀 Integration with FastAPI (`main.py`)
 
 **File:** `app/main.py`
 ```python
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from app.core.database import create_db_and_tables
-from app.api.main import api_router
+
+from app.core.database import create_db_and_tables, get_sync_session
+from app.core.superuser import create_first_superuser
 ```
 
-### 4.1 Lifespan Function
+### 5.1 Lifespan Function
 ```python
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db_and_tables()
+
+    session = get_sync_session()
+    create_first_superuser(session)
+    session.close()
+
     yield
+
+    pass
 ```
 
-FastAPI runs this in two phases:
+Startup sequence:
 
-**Startup:**
-- Ensures all database tables exist
-- Ideal for initializing system resources
+- Create database and tables
 
-**Shutdown:**
-- You may place cleanup logic here if needed
+- Open a synchronous session
 
-### Registering the Lifespan
-```python
-app = FastAPI(lifespan=lifespan)
-```
+- Create first superuser
 
-> **Important:** Because of this mechanism, you do not need to run migration scripts for SQLite in development.
+- Close session
 
----
+- Start API
 
-## 5. ▶️ Using the Database in Endpoints
+## 6. ▶️ Using the Database in Endpoints
 
 **Example:**
 ```python
@@ -133,7 +178,7 @@ SessionDep = Annotated[Session, Depends(get_session)]
 
 ---
 
-## 6. 📄 Where the Database is Stored
+## 7. 📄 Where the Database is Stored
 
 SQLite automatically creates the file:
 ```
@@ -148,7 +193,7 @@ You can inspect it using:
 
 ---
 
-## 7. 🔄 Migrating to PostgreSQL (Future Phase)
+## 8. 🔄 Migrating to PostgreSQL (Future Phase)
 
 Your current structure is fully compatible with PostgreSQL.
 
@@ -162,20 +207,21 @@ And add a migration tool like **Alembic**.
 
 ---
 
-## 8. ✔️ Advantages of This Setup
+## 9. ✔️ Advantages of This Setup
 
-- Simple and perfect for development
-- Automatic table creation on startup
-- Easy to migrate to production databases later
-- Clean integration with FastAPI's lifespan and dependency injection
+- Simple and ideal for development
+- Automatic table & superuser creation
+- Clean separation of concerns
+- Ready for future database scaling
 
 ---
 
-## 9. 📌 Conclusion
+## 10. 📌 Conclusion
 
 With this setup you get:
 
-- ✅ A fully configured SQLModel database engine
-- ✅ Automatic table creation at startup
-- ✅ Session lifecycle management through FastAPI
-- ✅ A foundation ready to scale to PostgreSQL
+- ✅ SQLite database configured with SQLModel
+- ✅ Automatic creation of tables
+- ✅ Automatic creation of the initial superuser
+- ✅ FastAPI lifespan handling for startup tasks
+- ✅ Ready-to-scale architecture

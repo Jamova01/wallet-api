@@ -36,6 +36,6 @@ def signup(*, session: Session, payload: SignupRequest) -> User:
         )
 
     user_data = UserCreate.model_validate(payload)
-    new_user = user_service.create(session=session, user=user_data)
+    new_user = user_service.create(session=session, user_data=user_data)
 
     return new_user

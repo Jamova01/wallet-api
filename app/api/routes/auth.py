@@ -72,4 +72,4 @@ def signup(
     Public user registration endpoint.
     Creates a new account with email and password.
     """
-    return auth_service.signup(session=session, user_data=user_in)
+    return auth_service.signup(session=session, payload=user_in)

@@ -16,7 +16,7 @@ from app.models.user import User
 from app.schemas.auth import TokenPayload
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/access-token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 SessionDep = Annotated[Session, Depends(get_session)]
 TokenDep = Annotated[str, Depends(oauth2_scheme)]

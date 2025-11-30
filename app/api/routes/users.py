@@ -32,14 +32,14 @@ async def read_user_me(current_user: CurrentUser) -> UserRead:
 )
 async def update_user_me(
     session: SessionDep,
-    user: UserUpdateMe,
+    user_in: UserUpdateMe,
     current_user: CurrentUser,
 ) -> UserRead:
     """Update the currently authenticated user's profile."""
     return user_service.update_me(
         session=session,
         current_user=current_user,
-        user=user,
+        user_data=user_in,
     )
 
 
@@ -82,10 +82,10 @@ async def read_users(session: SessionDep) -> List[UserRead]:
 )
 async def create_user(
     session: SessionDep,
-    user: UserCreate,
+    user_in: UserCreate,
 ) -> UserRead:
     """Create a new user (superuser only)."""
-    return user_service.create(session, user)
+    return user_service.create(session=session, user_data=user_in)
 
 
 @router.get(
@@ -110,10 +110,10 @@ async def read_user(user_id: UUID, session: SessionDep) -> UserRead:
 async def update_user(
     session: SessionDep,
     user_id: UUID,
-    user: UserUpdate,
+    user_in: UserUpdate,
 ) -> UserRead:
     """Update a user by ID (superuser only)."""
-    return user_service.update(session=session, user_id=user_id, user=user)
+    return user_service.update(session=session, user_id=user_id, user_data=user_in)
 
 
 @router.delete(

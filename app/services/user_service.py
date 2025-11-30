@@ -57,15 +57,15 @@ def get_user_by_email(session: Session, email: str) -> User | None:
     return session.exec(statement).first()
 
 
-def create(session: Session, user: UserCreate) -> User:
+def create(session: Session, user_data: UserCreate) -> User:
     """Create a new user."""
-    if get_user_by_email(session=session, email=user.email):
+    if get_user_by_email(session=session, email=user_data.email):
         raise EmailAlreadyExistsException()
 
     db_user = User(
-        email=user.email,
-        full_name=user.full_name,
-        hashed_password=get_password_hash(user.password),
+        email=user_data.email,
+        full_name=user_data.full_name,
+        hashed_password=get_password_hash(user_data.password),
     )
     session.add(db_user)
     session.commit()
@@ -73,10 +73,10 @@ def create(session: Session, user: UserCreate) -> User:
     return db_user
 
 
-def update(session: Session, user_id: UUID, user: UserUpdate) -> User:
+def update(session: Session, user_id: UUID, user_data: UserUpdate) -> User:
     """Update a user's information by ID."""
     db_user = get_by_id(session=session, user_id=user_id)
-    update_data = user.model_dump(exclude_unset=True)
+    update_data = user_data.model_dump(exclude_unset=True)
 
     if "password" in update_data:
         password = update_data.pop("password")
@@ -101,15 +101,16 @@ def delete(session: Session, user_id: UUID) -> None:
     session.commit()
 
 
-def update_me(session: Session, current_user: User, user: UserUpdateMe) -> User:
+def update_me(session: Session, current_user: User, user_data: UserUpdateMe) -> User:
     """Update the currently authenticated user's profile."""
-    user_data = user.model_dump(exclude_unset=True)
-    if "email" in user_data:
+
+    update_data = user_data.model_dump(exclude_unset=True)
+    if "email" in update_data:
         existing = get_user_by_email(session=session, email=user_data["email"])
         if existing and existing.id != current_user.id:
             raise EmailAlreadyExistsException()
 
-    current_user.sqlmodel_update(user_data)
+    current_user.sqlmodel_update(update_data)
     session.add(current_user)
     session.commit()
     session.refresh(current_user)

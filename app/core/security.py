@@ -10,12 +10,12 @@ from app.core.config import settings
 password_hash = PasswordHash.recommended()
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return password_hash.verify(plain_password, hashed_password)
-
-
 def get_password_hash(password: str) -> str:
     return password_hash.hash(password)
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return password_hash.verify(plain_password, hashed_password)
 
 
 def create_access_token(subject: str | Any, expires_delta: timedelta) -> str:
@@ -24,5 +24,15 @@ def create_access_token(subject: str | Any, expires_delta: timedelta) -> str:
     return jwt.encode(
         to_encode,
         settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM,
+    )
+
+
+def create_refresh_token(subject: str | Any, expires_delta: timedelta) -> str:
+    expire = datetime.now(timezone.utc) + expires_delta
+    to_encode = {"exp": expire, "sub": str(subject)}
+    return jwt.encode(
+        to_encode,
+        settings.REFRESH_SECRET_KEY,
         algorithm=settings.ALGORITHM,
     )

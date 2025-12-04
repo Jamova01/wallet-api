@@ -13,11 +13,19 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    SECRET_KEY: str
+    # Security
     ALGORITHM: str = "HS256"
+    SECRET_KEY: str
+    REFRESH_SECRET_KEY: str
+
+    # Token expiration
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # API
     API_V1_STR: str = "/api/v1"
 
+    # Initial superuser
     FIRST_SUPERUSER: EmailStr
     FIRST_SUPERUSER_PASSWORD: str
 

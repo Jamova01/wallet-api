@@ -1,7 +1,9 @@
 import uuid
 from datetime import datetime, timezone
-from sqlmodel import SQLModel, Field
+from sqlmodel import Relationship, SQLModel, Field
 from pydantic import EmailStr
+
+from app.models.token import RefreshToken
 
 
 class User(SQLModel, table=True):
@@ -19,3 +21,5 @@ class User(SQLModel, table=True):
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc), nullable=False
     )
+
+    refresh_tokens: list["RefreshToken"] = Relationship(back_populates="user")

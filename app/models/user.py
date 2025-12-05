@@ -1,8 +1,8 @@
-from uuid import UUID, uuid4
 from typing import TYPE_CHECKING, List
-from sqlmodel import Relationship, SQLModel, Field
-from pydantic import EmailStr
+from uuid import UUID, uuid4
 
+from pydantic import EmailStr
+from sqlmodel import SQLModel, Field, Relationship
 
 if TYPE_CHECKING:
     from app.models import RefreshToken
@@ -15,4 +15,5 @@ class User(SQLModel, table=True):
     is_active: bool = Field(default=True)
     is_superuser: bool = Field(default=False)
 
+    # Relationships
     refresh_tokens: List["RefreshToken"] = Relationship(back_populates="user")

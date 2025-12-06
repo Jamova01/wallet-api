@@ -1,9 +1,9 @@
-"""Authentication endpoints for user login, signup, and token refresh.
+"""Authentication endpoints for user login, signup, token refresh, and logout.
 
 This module exposes the authentication-related HTTP endpoints using FastAPI
 routers. Each endpoint delegates its business logic to the authentication
-service layer (`auth_service`), keeping the routing layer clean and focused
-on request/response handling only.
+service layer (`auth_service`), keeping the routing layer focused on handling
+request/response serialization and HTTP routing.
 """
 
 from typing import Annotated
@@ -25,25 +25,22 @@ def login(
     session: SessionDep,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ) -> Token:
-    """Authenticate a user and issue access + refresh tokens.
+    """Authenticate a user and issue access and refresh tokens.
 
-    This endpoint implements the OAuth2 Password Flow.
-    The value provided in the ``username`` field is treated as the user's email.
-    The credentials are validated by the authentication service, which issues
-    both access and refresh tokens on success.
+    Implements the OAuth2 Password Flow where the ``username`` field is treated
+    as the user's email. Credentials are validated by the authentication service,
+    which issues both access and refresh tokens upon successful authentication.
 
     Args:
-        session (SessionDep):
-            Database session dependency.
-        form_data (OAuth2PasswordRequestForm):
-            Contains ``username`` (email address) and ``password``.
+        session (SessionDep): Database session dependency.
+        form_data (OAuth2PasswordRequestForm): Form data containing
+            ``username`` (email) and ``password``.
 
     Returns:
-        Token: Access and refresh JWT tokens.
+        Token: A token pair containing both access and refresh tokens.
 
     Raises:
-        HTTPException:
-            If the credentials are invalid or the account is inactive.
+        HTTPException: If the credentials are invalid or the user is inactive.
     """
     return auth_service.login(
         session=session,
@@ -62,25 +59,20 @@ def signup(
     session: SessionDep,
     user_in: SignupRequest,
 ) -> UserRead:
-    """Create a new user account.
+    """Register a new user account.
 
-    This endpoint registers a user with the provided signup data.
-    Password hashing, validation, and email uniqueness checks are handled
-    by the authentication service layer.
+    This endpoint processes a signup request and delegates validation,
+    hashing, and email uniqueness checks to the authentication service.
 
     Args:
-        session (SessionDep):
-            Database session dependency.
-        user_in (SignupRequest):
-            The signup payload containing email, password, and user information.
+        session (SessionDep): Database session dependency.
+        user_in (SignupRequest): Signup payload containing user information.
 
     Returns:
-        UserRead:
-            The newly created user, excluding sensitive information.
+        UserRead: The newly created user object without sensitive fields.
 
     Raises:
-        HTTPException:
-            If the email is already registered or validation fails.
+        HTTPException: If the email is already registered or validation fails.
     """
     return auth_service.signup(session=session, payload=user_in)
 
@@ -96,26 +88,50 @@ def refresh(
 ) -> Token:
     """Issue a new access token using a valid refresh token.
 
-    Delegates refresh-token validation and access-token generation
-    to the authentication service. If the refresh token is valid,
-    a new access token is issued and the existing refresh token is retained.
+    Delegates validation and token rotation logic to the authentication service.
+    If the refresh token is valid, a new access token is issued while retaining
+    the existing refresh token.
 
     Args:
-        session (SessionDep):
-            Database session dependency.
-        refresh_token (RefreshTokenRequest):
-            Request payload containing the refresh token string.
+        session (SessionDep): Database session dependency.
+        refresh_token (RefreshTokenRequest): Payload containing the refresh token.
 
     Returns:
-        Token:
-            A token pair containing the new access token and the existing
+        Token: A token pair containing the new access token and the existing
             refresh token.
 
     Raises:
-        HTTPException:
-            If the refresh token is invalid, expired, or revoked.
+        HTTPException: If the refresh token is invalid, expired, or revoked.
     """
     return auth_service.refresh(
+        session=session,
+        refresh_token=refresh_token.refresh_token,
+    )
+
+
+@router.post(
+    "/logout",
+    summary="Revoke a refresh token and log out the user",
+    response_model=None,
+    status_code=204,
+)
+def logout(
+    session: SessionDep,
+    refresh_token: RefreshTokenRequest,
+) -> None:
+    """Log out a user by revoking their refresh token.
+
+    This endpoint invalidates the specified refresh token, preventing further
+    use for token renewal. Logout does not return content.
+
+    Args:
+        session (SessionDep): Database session dependency.
+        refresh_token (RefreshTokenRequest): Payload containing the refresh token.
+
+    Raises:
+        HTTPException: If the refresh token is invalid.
+    """
+    return auth_service.logout(
         session=session,
         refresh_token=refresh_token.refresh_token,
     )

@@ -1,7 +1,17 @@
-"""Authentication service providing login, signup and token management."""
+"""Authentication service for handling login, signup, logout, and token management.
+
+This module centralizes the business logic for user authentication:
+- Credential validation
+- Access and refresh token issuance
+- Refresh token persistence, validation, and revocation
+- User registration
+
+The routing layer delegates all security-related logic to this service.
+"""
 
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from uuid import UUID
 
 from fastapi import HTTPException
 from sqlmodel import Session, select
@@ -22,16 +32,15 @@ from app.services import user_service
 
 
 def authenticate(session: Session, email: str, password: str) -> Optional[User]:
-    """
-    Verify a user's credentials by email and password.
+    """Validate a user's credentials.
 
     Args:
-        session (Session): The database session to use.
+        session (Session): Database session to use.
         email (str): User's email address.
-        password (str): Plain text password to verify.
+        password (str): Plain-text password to verify.
 
     Returns:
-        Optional[User]: The User instance if credentials are valid, else None.
+        Optional[User]: The user if credentials are valid; otherwise, None.
     """
     user = user_service.get_user_by_email(session=session, email=email)
     if not user:
@@ -44,19 +53,18 @@ def authenticate(session: Session, email: str, password: str) -> Optional[User]:
 
 
 def login(session: Session, email: str, password: str) -> Token:
-    """
-    Authenticate user and issue both access and refresh tokens.
+    """Authenticate a user and issue access and refresh tokens.
 
     Args:
-        session (Session): The database session to use.
+        session (Session): Database session to use.
         email (str): User's email address.
-        password (str): Plain text password.
+        password (str): Plain-text password.
 
     Returns:
-        Token: An object containing `access_token` and `refresh_token`.
+        Token: A token pair containing an access and a refresh token.
 
     Raises:
-        HTTPException: If credentials are invalid or user is inactive.
+        HTTPException: If credentials are invalid or the user is inactive.
     """
     user = authenticate(session=session, email=email, password=password)
     if not user:
@@ -77,18 +85,17 @@ def login(session: Session, email: str, password: str) -> Token:
 
 
 def signup(session: Session, payload: SignupRequest) -> User:
-    """
-    Register a new user in the system.
+    """Register a new user in the system.
 
     Args:
-        session (Session): The database session to use.
-        payload (SignupRequest): Data required for user creation.
+        session (Session): Database session to use.
+        payload (SignupRequest): Data required to create the user.
 
     Returns:
         User: The newly created user instance.
 
     Raises:
-        HTTPException: If a user with the same email already exists.
+        HTTPException: If the email is already registered.
     """
     existing_user = user_service.get_user_by_email(
         session=session,
@@ -97,7 +104,7 @@ def signup(session: Session, payload: SignupRequest) -> User:
     if existing_user:
         raise HTTPException(
             status_code=400,
-            detail="The user with this email already exists in the system",
+            detail="A user with this email already exists.",
         )
 
     user_data = UserCreate.model_validate(payload)
@@ -109,29 +116,27 @@ def signup(session: Session, payload: SignupRequest) -> User:
 # ---------------------------------------------------------------------------
 
 
-def create_access_token(user_id: int) -> str:
-    """
-    Generate a new JWT access token for a user.
+def create_access_token(user_id: UUID) -> str:
+    """Generate a new signed JWT access token.
 
     Args:
-        user_id (int): Identifier of the user.
+        user_id (UUID): Identifier of the user.
 
     Returns:
-        str: A signed JWT access token.
+        str: A signed access token.
     """
     return security.create_access_token(subject=user_id)
 
 
-def create_refresh_token_record(session: Session, user_id: int) -> RefreshToken:
-    """
-    Create and persist a new refresh token for a user.
+def create_refresh_token_record(session: Session, user_id: UUID) -> RefreshToken:
+    """Create and persist a new refresh token record.
 
     Args:
-        session (Session): The database session to use.
-        user_id (int): Identifier of the user.
+        session (Session): Database session to use.
+        user_id (UUID): Identifier of the associated user.
 
     Returns:
-        RefreshToken: The database record for the new refresh token.
+        RefreshToken: The newly stored refresh token record.
     """
     raw_token = security.create_refresh_token(subject=user_id)
     expires_at = datetime.now(timezone.utc) + timedelta(
@@ -150,11 +155,10 @@ def create_refresh_token_record(session: Session, user_id: int) -> RefreshToken:
 
 
 def validate_refresh_token(session: Session, token: str) -> Optional[RefreshToken]:
-    """
-    Validate a refresh token: existence, non-revoked and not expired.
+    """Validate a refresh token by checking existence, non-revocation, and expiration.
 
     Args:
-        session (Session): The database session to use.
+        session (Session): Database session to use.
         token (str): Refresh token string provided by the client.
 
     Returns:
@@ -180,31 +184,35 @@ def validate_refresh_token(session: Session, token: str) -> Optional[RefreshToke
 
 
 def revoke_refresh_token(session: Session, token_record: RefreshToken) -> None:
-    """
-    Revoke a refresh token so it can no longer be used.
+    """Revoke a refresh token so it cannot be reused.
 
     Args:
-        session (Session): The database session to use.
+        session (Session): Database session to use.
         token_record (RefreshToken): The token record to revoke.
     """
     token_record.revoked = True
+    token_record.revoked_at = datetime.now(timezone.utc)
     session.add(token_record)
     session.commit()
 
 
-def refresh(session: Session, refresh_token: str) -> Token:
-    """
-    Refresh access token using a valid refresh token.
+# ---------------------------------------------------------------------------
+# Refresh / Logout Flow
+# ---------------------------------------------------------------------------
 
-    Validates the provided refresh token, updates its last-used timestamp,
-    and issues a new access token. The existing refresh token remains valid.
+
+def refresh(session: Session, refresh_token: str) -> Token:
+    """Issue a new access token using a valid refresh token.
+
+    The refresh token is validated, its last-used timestamp updated,
+    and a new access token is issued.
 
     Args:
-        session (Session): The database session to use.
-        refresh_token (str): The refresh token string provided by the client.
+        session (Session): Database session to use.
+        refresh_token (str): The refresh token provided by the client.
 
     Returns:
-        Token: An object containing the new access token and the same
+        Token: A token pair containing a new access token and the same
         refresh token.
 
     Raises:
@@ -220,3 +228,20 @@ def refresh(session: Session, refresh_token: str) -> Token:
 
     new_access = create_access_token(user_id=record.user_id)
     return Token(access_token=new_access, refresh_token=record.token)
+
+
+def logout(session: Session, refresh_token: str) -> None:
+    """Logout a user by revoking their refresh token.
+
+    Args:
+        session (Session): Database session to use.
+        refresh_token (str): The refresh token to revoke.
+
+    Raises:
+        HTTPException: If the refresh token is invalid.
+    """
+    record = validate_refresh_token(session=session, token=refresh_token)
+    if not record:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    revoke_refresh_token(session=session, token_record=record)

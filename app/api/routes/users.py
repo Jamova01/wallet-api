@@ -1,6 +1,8 @@
 from typing import List
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, status
+
 from app.api.dependencies import CurrentUser, SessionDep, get_current_active_superuser
 from app.schemas.common import Message
 from app.schemas.user import (
@@ -21,7 +23,12 @@ router = APIRouter(prefix="/users", tags=["users"])
     response_model=UserRead,
 )
 async def read_user_me(current_user: CurrentUser) -> UserRead:
-    """Retrieve the currently authenticated user's profile."""
+    """
+    Retrieve the profile of the currently authenticated user.
+
+    Returns:
+        UserRead: The authenticated user's information.
+    """
     return current_user
 
 
@@ -35,7 +42,17 @@ async def update_user_me(
     user_in: UserUpdateMe,
     current_user: CurrentUser,
 ) -> UserRead:
-    """Update the currently authenticated user's profile."""
+    """
+    Update the authenticated user's profile.
+
+    Args:
+        session: Database session dependency.
+        user_in: Fields allowed for the current user to update.
+        current_user: The authenticated user performing the request.
+
+    Returns:
+        UserRead: Updated user information.
+    """
     return user_service.update_me(
         session=session,
         current_user=current_user,
@@ -53,7 +70,17 @@ async def update_password_me(
     body: UpdatePassword,
     current_user: CurrentUser,
 ) -> Message:
-    """Update the currently authenticated user's password."""
+    """
+    Update the authenticated user's password.
+
+    Args:
+        session: Database session dependency.
+        body: Contains the current and new password.
+        current_user: The authenticated user performing the update.
+
+    Returns:
+        Message: Confirmation that the password was updated.
+    """
     return user_service.update_password(
         session=session,
         body=body,
@@ -69,7 +96,17 @@ async def update_password_me(
     response_model=List[UserRead],
 )
 async def read_users(session: SessionDep) -> List[UserRead]:
-    """Retrieve all users (superuser only)."""
+    """
+    Retrieve all registered users.
+
+    Accessible only to active superusers.
+
+    Args:
+        session: Database session dependency.
+
+    Returns:
+        List[UserRead]: A list of all users.
+    """
     return user_service.get_all(session)
 
 
@@ -84,7 +121,18 @@ async def create_user(
     session: SessionDep,
     user_in: UserCreate,
 ) -> UserRead:
-    """Create a new user (superuser only)."""
+    """
+    Create a new user account.
+
+    Superuser-only operation.
+
+    Args:
+        session: Database session dependency.
+        user_in: User creation payload with required fields.
+
+    Returns:
+        UserRead: The newly created user.
+    """
     return user_service.create(session=session, user_data=user_in)
 
 
@@ -96,7 +144,18 @@ async def create_user(
     response_model=UserRead,
 )
 async def read_user(user_id: UUID, session: SessionDep) -> UserRead:
-    """Retrieve a user by ID (superuser only)."""
+    """
+    Retrieve a user by their UUID.
+
+    Superuser-only operation.
+
+    Args:
+        user_id: Unique identifier of the user.
+        session: Database session dependency.
+
+    Returns:
+        UserRead: The requested user.
+    """
     return user_service.get_by_id(session=session, user_id=user_id)
 
 
@@ -112,7 +171,19 @@ async def update_user(
     user_id: UUID,
     user_in: UserUpdate,
 ) -> UserRead:
-    """Update a user by ID (superuser only)."""
+    """
+    Update a user's information by ID.
+
+    Superuser-only operation.
+
+    Args:
+        session: Database session dependency.
+        user_id: Unique identifier of the user.
+        user_in: Fields to update.
+
+    Returns:
+        UserRead: Updated user data.
+    """
     return user_service.update(session=session, user_id=user_id, user_data=user_in)
 
 
@@ -126,5 +197,16 @@ async def delete_user(
     session: SessionDep,
     user_id: UUID,
 ) -> None:
-    """Delete a user by ID (superuser only)."""
+    """
+    Delete a user by their UUID.
+
+    Superuser-only operation.
+
+    Args:
+        session: Database session dependency.
+        user_id: The ID of the user to delete.
+
+    Returns:
+        None
+    """
     user_service.delete(session=session, user_id=user_id)
